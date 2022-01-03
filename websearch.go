@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -11,10 +12,10 @@ import (
 )
 
 type Data struct {
-	url           string
-	path          string
-	statusCode    int
-	contentLength int
+	Url           string `json:"url"`
+	Path          string `json:"path"`
+	StatusCode    int    `json:"statusCode"`
+	ContentLength int    `json:"contentLength"`
 }
 
 func readWordlist(path string) []string {
@@ -39,26 +40,37 @@ func checkFlags(urlFlag string, wordlistFlag string) {
 
 func request(url string, path string) Data {
 	u := fmt.Sprintf("%s/%s", url, path)
-	response, _ := http.Get(u)
-	fmt.Println(u, response.StatusCode, response.ContentLength)
-	return Data{
-		url:           url,
-		path:          path,
-		statusCode:    response.StatusCode,
-		contentLength: int(response.ContentLength),
+	response, err := http.Get(u)
+	if err != nil {
+		return Data{}
 	}
+	body, _ := ioutil.ReadAll(response.Body)
+	contentLength := len(string(body))
+	fmt.Println(u, response.StatusCode, contentLength)
+	return Data{
+		Url:           url,
+		Path:          path,
+		StatusCode:    response.StatusCode,
+		ContentLength: contentLength,
+	}
+}
+
+func outputToFile(data []Data, path string) {
+	j, _ := json.Marshal(data)
+	ioutil.WriteFile(path, j, 0644)
 }
 
 func main() {
 	urlFlag := flag.String("u", "", "target URL")
-	wordlistFlag := flag.String("w", "", "wordlist")
+	wordlistFlag := flag.String("w", "", "path to wordlist file")
 	threadsFlag := flag.Int("t", 30, "number of threads")
+	outputFlag := flag.String("o", "", "output file (json)")
 	flag.Parse()
+
 	checkFlags(*urlFlag, *wordlistFlag)
 
 	var wg sync.WaitGroup
 	var words = make(chan string)
-
 	var data []Data
 
 	go func() {
@@ -79,5 +91,8 @@ func main() {
 	}
 
 	wg.Wait()
-	fmt.Print(data)
+
+	if len(*outputFlag) != 0 {
+		outputToFile(data, *outputFlag)
+	}
 }
