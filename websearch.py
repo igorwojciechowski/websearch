@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import asyncio
+from typing import Coroutine
 import warnings
 import sys
 from aiohttp import ClientSession, ClientConnectorError
@@ -17,15 +18,13 @@ def read_wordlist(wordlist: str) -> list:
         return [_.replace('\n', '') for _ in _file.readlines()]
 
 
-class TooManyErrorsException(Exception):
-
-    def __init__(self):
-        super().__init__()
+class ErrorsLimitExceededException(Exception):
+    pass
 
 
 class Websearch:
 
-    def __init__(self, target, wordlist, threads, max_errors):
+    def __init__(self, target: str, wordlist: str, threads: int, max_errors: int):
         self.target = target
         self.wordlist = read_wordlist(wordlist)
         self.semaphore = asyncio.Semaphore(threads)
@@ -48,13 +47,16 @@ class Websearch:
         except ClientConnectorError:
             self.errors += 1
 
-    async def threaded(self, session: ClientSession, path: str):
+    async def threaded(self, session: ClientSession, path: str) -> Coroutine:
+        """
+        
+        """
         async with self.semaphore:
             if self.errors >= self.max_errors:
-                raise TooManyErrorsException
+                raise ErrorsLimitExceededException
             return await self.fetch(session=session, path=path)
 
-    async def run(self):
+    async def run(self) -> None:
         async with ClientSession() as session:
             tasks = []
             for word in self.wordlist:
@@ -63,24 +65,26 @@ class Websearch:
 
 
 if __name__ == "__main__":
-    ARGPARSER = argparse.ArgumentParser()
-    ARGPARSER.add_argument('-u', '--url', type=str,
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('-u', '--url', type=str,
                            help='URL to be enumerated', required=True)
-    ARGPARSER.add_argument('-w', '--wordlist', type=str,
+    argparser.add_argument('-w', '--wordlist', type=str,
                            help='path to a wordlist', required=True)
-    ARGPARSER.add_argument('-t', '--threads', type=int,
+    argparser.add_argument('-t', '--threads', type=int,
                            help='number of threads', default=30)
-    ARGPARSER.add_argument('--max_errors', type=int, help='Max errors', default=30)
-    ARGS = ARGPARSER.parse_args()
+    argparser.add_argument('--max_errors', type=int,
+                           help='Max errors', default=30)
+    args = argparser.parse_args()
 
-    config = ARGS.url, ARGS.wordlist, ARGS.threads, ARGS.max_errors
+    config = args.url, args.wordlist, args.threads, args.max_errors
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(Websearch(*config).run())
-    except TooManyErrorsException:
+    except ErrorsLimitExceededException:
         for task in asyncio.Task.all_tasks():
             task.cancel()
         loop.stop()
+        sys.stderr.write('Errors limit exceeded')
         sys.exit(1)
     finally:
         loop.run_until_complete(loop.shutdown_asyncgens())
