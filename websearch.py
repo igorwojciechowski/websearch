@@ -6,23 +6,28 @@ import warnings
 import sys
 from aiohttp import ClientSession, ClientConnectorError
 
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-
 
 def read_wordlist(wordlist: str) -> list:
     """
-    Returns a list of words read from wordlist file
+    Returns a list of words read from wordlist file.
+
     :param wordlist: path to wordlist file
+    :return: list of words read from wordlist
     """
     with open(wordlist, 'r', encoding='utf-8') as _file:
         return [_.replace('\n', '') for _ in _file.readlines()]
 
 
 class ErrorsLimitExceededException(Exception):
-    pass
+    """
+    Exception raised when max errors limit is reached.
+    """
 
 
 class Websearch:
+    """
+    HTTP content discovery class utilizing `asyncio` package.
+    """
 
     def __init__(self, target: str, wordlist: str, threads: int, max_errors: int):
         self.target = target
@@ -33,7 +38,10 @@ class Websearch:
 
     async def fetch(self, session: ClientSession, path: str) -> None:
         """
-        Sends a request to a given URL and returns formatted result
+        Sends a request to a given URL and prints formatted result.
+        Increments errors whenever a connection error occurs or set them down to 0
+        on successful request.
+
         :param session: http client session
         :param target: target URL
         :param path: path concatenated to the target URL
@@ -47,9 +55,14 @@ class Websearch:
         except ClientConnectorError:
             self.errors += 1
 
-    async def threaded(self, session: ClientSession, path: str) -> Coroutine:
+    async def fetch_threaded(self, session: ClientSession, path: str) -> Coroutine:
         """
-        
+        Creates a coroutine of a `fetch` function.
+
+        :param session: http client session
+        :param path: path to be concatenated with target URL
+        :raise: `ErrorsLimitExceededException` when requests fail `max_errors` times in a row
+        :return: coroutine
         """
         async with self.semaphore:
             if self.errors >= self.max_errors:
@@ -57,10 +70,13 @@ class Websearch:
             return await self.fetch(session=session, path=path)
 
     async def run(self) -> None:
+        """
+        Creates tasks and run them concurrently.
+        """
         async with ClientSession() as session:
             tasks = []
             for word in self.wordlist:
-                tasks.append(self.threaded(session=session, path=word))
+                tasks.append(self.fetch_threaded(session=session, path=word))
             await asyncio.gather(*tasks)
 
 
@@ -81,6 +97,7 @@ if __name__ == "__main__":
     try:
         loop.run_until_complete(Websearch(*config).run())
     except ErrorsLimitExceededException:
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
         for task in asyncio.Task.all_tasks():
             task.cancel()
         loop.stop()
