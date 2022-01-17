@@ -80,6 +80,16 @@ class Websearch:
             await asyncio.gather(*tasks)
 
 
+def stop_loop():
+    """
+    Cancels pending tasks and stops event loop.
+    """
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    for task in asyncio.Task.all_tasks():
+        task.cancel()
+    loop.stop()
+
+
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-u', '--url', type=str,
@@ -97,11 +107,11 @@ if __name__ == "__main__":
     try:
         loop.run_until_complete(Websearch(*config).run())
     except ErrorsLimitExceededException:
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
-        for task in asyncio.Task.all_tasks():
-            task.cancel()
-        loop.stop()
+        stop_loop()
         sys.stderr.write('Errors limit exceeded')
+        sys.exit(1)
+    except KeyboardInterrupt:
+        stop_loop()
         sys.exit(1)
     finally:
         loop.run_until_complete(loop.shutdown_asyncgens())
