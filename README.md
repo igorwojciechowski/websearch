@@ -6,7 +6,7 @@ Sends GET request to the target URL with a path read from wordlist and prints th
 ## Usage
 
 ```bash
-usage: websearch.py [-h] -u URL -w WORDLIST [-t THREADS] [--max_errors MAX_ERRORS]
+usage: websearch.py [-h] -u URL -w WORDLIST [-t THREADS] [--max_errors MAX_ERRORS] [-fi FILTER_INCLUDE] [-fe FILTER_EXCLUDE]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -17,6 +17,10 @@ optional arguments:
                         number of threads
   --max_errors MAX_ERRORS
                         Max errors
+  -fi FILTER_INCLUDE, --filter_include FILTER_INCLUDE
+                        Include only status codes; comma-separated
+  -fe FILTER_EXCLUDE, --filter_exclude FILTER_EXCLUDE
+                        Exclude status codes; comma-separated
 ```
 
 ```bash
