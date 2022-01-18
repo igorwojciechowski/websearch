@@ -29,12 +29,26 @@ class Websearch:
     HTTP content discovery class utilizing `asyncio` package.
     """
 
-    def __init__(self, target: str, wordlist: str, threads: int, max_errors: int):
+    def __init__(self, target: str, wordlist: str, threads: int, max_errors: int, filter_include: str, filter_exclude: str):
         self.target = target
         self.wordlist = read_wordlist(wordlist)
         self.semaphore = asyncio.Semaphore(threads)
         self.max_errors = max_errors
+        self.filter_included = filter_include
+        self.filter_excluded = filter_exclude
         self.errors = 0
+    
+    def is_filtered(self, status_code: int) -> bool:
+        """
+        Checks whether status code should be filtered.
+        :param status_code: response status code
+        :return: True if status code should be filtered
+        """
+        included = self.filter_included.split(",")
+        excluded = self.filter_excluded.split(",")
+        if str(status_code) in included:
+            return False
+        return str(status_code) in excluded
 
     async def fetch(self, session: ClientSession, path: str) -> None:
         """
@@ -50,7 +64,8 @@ class Websearch:
         try:
             response = await session.request(method='GET', url=url, allow_redirects=False, ssl=False)
             content_length = len(str(await response.content.read()))
-            print(f"{url:30}\t{response.status:5}\t{content_length:8}")
+            if not self.is_filtered(response.status):
+                print(f"{url:30}\t{response.status:5}\t{content_length:8}")
             self.errors = 0
         except ClientConnectorError:
             self.errors += 1
@@ -100,9 +115,13 @@ if __name__ == "__main__":
                            help='number of threads', default=30)
     argparser.add_argument('--max_errors', type=int,
                            help='Max errors', default=30)
+    argparser.add_argument('-fi', '--filter_include', type=str, default="",
+                           help='Include only status codes; comma-separated',)
+    argparser.add_argument('-fe', '--filter_exclude', type=str, default="404",
+                           help='Exclude status codes; comma-separated')
     args = argparser.parse_args()
 
-    config = args.url, args.wordlist, args.threads, args.max_errors
+    config = args.url, args.wordlist, args.threads, args.max_errors, args.filter_include, args.filter_exclude
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(Websearch(*config).run())
