@@ -29,15 +29,16 @@ class Websearch:
     HTTP content discovery class utilizing `asyncio` package.
     """
 
-    def __init__(self, target: str, wordlist: str, threads: int, max_errors: int, filter_include: str, filter_exclude: str):
+    def __init__(self, target: str, wordlist: str, threads: int, methods: list, max_errors: int, filter_include: str, filter_exclude: str):
         self.target = target
         self.wordlist = read_wordlist(wordlist)
         self.semaphore = asyncio.Semaphore(threads)
+        self.methods = methods
         self.max_errors = max_errors
         self.filter_included = filter_include
         self.filter_excluded = filter_exclude
         self.errors = 0
-    
+
     def is_filtered(self, status_code: int) -> bool:
         """
         Checks whether status code should be filtered.
@@ -50,7 +51,7 @@ class Websearch:
             return False
         return str(status_code) in excluded
 
-    async def fetch(self, session: ClientSession, path: str) -> None:
+    async def fetch(self, session: ClientSession, method: str, path: str) -> None:
         """
         Sends a request to a given URL and prints formatted result.
         Increments errors whenever a connection error occurs or set them down to 0
@@ -62,15 +63,15 @@ class Websearch:
         """
         url = f"{self.target}/{path}"
         try:
-            response = await session.request(method='GET', url=url, allow_redirects=False, ssl=False)
+            response = await session.request(method=method, url=url, allow_redirects=False, ssl=False)
             content_length = len(str(await response.content.read()))
             if not self.is_filtered(response.status):
-                print(f"{url:30}\t{response.status:5}\t{content_length:8}")
+                print(f"{method:10}\t{url:30}\t{response.status:5}\t{content_length:8}")
             self.errors = 0
         except ClientConnectorError:
             self.errors += 1
 
-    async def fetch_threaded(self, session: ClientSession, path: str) -> Coroutine:
+    async def fetch_threaded(self, session: ClientSession, method: str, path: str) -> Coroutine:
         """
         Creates a coroutine of a `fetch` function.
 
@@ -82,7 +83,7 @@ class Websearch:
         async with self.semaphore:
             if self.errors >= self.max_errors:
                 raise ErrorsLimitExceededException
-            return await self.fetch(session=session, path=path)
+            return await self.fetch(session=session, method=method, path=path)
 
     async def run(self) -> None:
         """
@@ -91,7 +92,9 @@ class Websearch:
         async with ClientSession() as session:
             tasks = []
             for word in self.wordlist:
-                tasks.append(self.fetch_threaded(session=session, path=word))
+                for method in self.methods:
+                    tasks.append(self.fetch_threaded(
+                        session=session, method=method, path=word))
             await asyncio.gather(*tasks)
 
 
@@ -105,6 +108,29 @@ def stop_loop():
     loop.stop()
 
 
+def valid_methods(arg: str) -> list:
+    """
+    Validates HTTP methods passed as `--methods` parameter.
+    :param arg: comma-separated list of HTTP methods
+    :return: validated list of methods
+    """
+    methods = [
+        'DELETE',
+        'GET',
+        'HEAD',
+        'OPTIONS',
+        'PATCH',
+        'POST',
+        'PUT',
+        'TRACE'
+    ]
+    arg_methods = arg.split(',')
+    for method in arg_methods:
+        if method not in methods:
+            raise ValueError
+    return arg_methods
+
+
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-u', '--url', type=str,
@@ -113,6 +139,8 @@ if __name__ == "__main__":
                            help='path to a wordlist', required=True)
     argparser.add_argument('-t', '--threads', type=int,
                            help='number of threads', default=30)
+    argparser.add_argument(
+        '-m', '--methods', type=valid_methods, default='GET')
     argparser.add_argument('--max_errors', type=int,
                            help='Max errors', default=30)
     argparser.add_argument('-fi', '--filter_include', type=str, default="",
@@ -121,7 +149,7 @@ if __name__ == "__main__":
                            help='Exclude status codes; comma-separated')
     args = argparser.parse_args()
 
-    config = args.url, args.wordlist, args.threads, args.max_errors, args.filter_include, args.filter_exclude
+    config = args.url, args.wordlist, args.threads, args.methods, args.max_errors, args.filter_include, args.filter_exclude
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(Websearch(*config).run())
