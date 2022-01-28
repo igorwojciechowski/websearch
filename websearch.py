@@ -115,7 +115,7 @@ def valid_methods(arg: str) -> list:
     :param arg: comma-separated list of HTTP methods
     :return: validated list of methods
     """
-    methods = [
+    http_methods = [
         'DELETE',
         'GET',
         'HEAD',
@@ -125,11 +125,11 @@ def valid_methods(arg: str) -> list:
         'PUT',
         'TRACE'
     ]
-    arg_methods = arg.split(',')
-    for method in arg_methods:
-        if method not in methods:
+    methods = arg.split(',')
+    for method in methods:
+        if method not in http_methods:
             raise ValueError
-    return arg_methods
+    return methods
 
 
 if __name__ == "__main__":
@@ -166,17 +166,16 @@ if __name__ == "__main__":
     argparser.add_argument(
         '-fi', '--filter_include',
         type=str,
-        help='Include only status codes; comma-separated',
+        help='include only status codes; comma-separated',
         default=""
     )
     argparser.add_argument(
         '-fe', '--filter_exclude',
         type=str,
-        help='Exclude status codes; comma-separated',
+        help='exclude status codes; comma-separated',
         default="404"
     )
     args = argparser.parse_args()
-
     config = args.url, args.wordlist, args.threads, args.methods, args.max_errors, args.filter_include, args.filter_exclude
     loop = asyncio.get_event_loop()
     try:
