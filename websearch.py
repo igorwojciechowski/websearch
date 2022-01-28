@@ -66,7 +66,8 @@ class Websearch:
             response = await session.request(method=method, url=url, allow_redirects=False, ssl=False)
             content_length = len(str(await response.content.read()))
             if not self.is_filtered(response.status):
-                print(f"{method:10}\t{url:30}\t{response.status:5}\t{content_length:8}")
+                print(
+                    f"{method:10}\t{url:30}\t{response.status:5}\t{content_length:8}")
             self.errors = 0
         except ClientConnectorError:
             self.errors += 1
@@ -133,20 +134,47 @@ def valid_methods(arg: str) -> list:
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('-u', '--url', type=str,
-                           help='URL to be enumerated', required=True)
-    argparser.add_argument('-w', '--wordlist', type=str,
-                           help='path to a wordlist', required=True)
-    argparser.add_argument('-t', '--threads', type=int,
-                           help='number of threads', default=30)
     argparser.add_argument(
-        '-m', '--methods', type=valid_methods, default='GET')
-    argparser.add_argument('--max_errors', type=int,
-                           help='Max errors', default=30)
-    argparser.add_argument('-fi', '--filter_include', type=str, default="",
-                           help='Include only status codes; comma-separated',)
-    argparser.add_argument('-fe', '--filter_exclude', type=str, default="404",
-                           help='Exclude status codes; comma-separated')
+        '-u', '--url',
+        type=str,
+        help='URL to be enumerated',
+        required=True
+    )
+    argparser.add_argument(
+        '-w', '--wordlist',
+        type=str,
+        help='path to a wordlist',
+        required=True
+    )
+    argparser.add_argument(
+        '-t', '--threads',
+        type=int,             
+        help='number of threads',
+        default=30
+    )
+    argparser.add_argument(
+        '-m', '--methods',
+        type=valid_methods,
+        default='GET'
+    )
+    argparser.add_argument(
+        '--max_errors',
+        type=int,
+        help='Max errors',
+        default=30
+    )
+    argparser.add_argument(
+        '-fi', '--filter_include',
+        type=str,
+        help='Include only status codes; comma-separated',
+        default=""
+    )
+    argparser.add_argument(
+        '-fe', '--filter_exclude',
+        type=str,
+        help='Exclude status codes; comma-separated',
+        default="404"
+    )
     args = argparser.parse_args()
 
     config = args.url, args.wordlist, args.threads, args.methods, args.max_errors, args.filter_include, args.filter_exclude
