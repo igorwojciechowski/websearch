@@ -8,16 +8,6 @@ import sys
 from aiohttp import ClientSession 
 
 
-sys.stderr.write("""
-
-
-        █ █ █ ██▀ █▄▄ █▀ ██▀ ▄▀█ █▀█ █▀▀ █ █
-        ▀▄▀▄▀ █▄▄ █▄█ ▄█ █▄▄ █▀█ █▀▄ █▄▄ █▀█ 0.1
-        
-
-""")
-
-
 def read_wordlist(wordlist: str) -> list:
     """
     Returns a list of words read from wordlist file.
@@ -144,6 +134,16 @@ def valid_methods(arg: str) -> list:
 
 
 if __name__ == "__main__":
+
+    sys.stderr.write("""
+
+
+            █ █ █ ██▀ █▄▄ █▀ ██▀ ▄▀█ █▀█ █▀▀ █ █
+            ▀▄▀▄▀ █▄▄ █▄█ ▄█ █▄▄ █▀█ █▀▄ █▄▄ █▀█ 0.1
+            
+
+    """)
+
     argparser = argparse.ArgumentParser()
     argparser.add_argument(
         '-u', '--url',
