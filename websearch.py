@@ -1,10 +1,21 @@
 #!/usr/bin/env python3
 import argparse
 import asyncio
+import contextlib
 from typing import Coroutine
 import warnings
 import sys
-from aiohttp import ClientSession, ClientConnectorError
+from aiohttp import ClientSession 
+
+
+sys.stderr.write("""
+
+
+        █ █ █ ██▀ █▄▄ █▀ ██▀ ▄▀█ █▀█ █▀▀ █ █
+        ▀▄▀▄▀ █▄▄ █▄█ ▄█ █▄▄ █▀█ █▀▄ █▄▄ █▀█ 0.1
+        
+
+""")
 
 
 def read_wordlist(wordlist: str) -> list:
@@ -67,9 +78,9 @@ class Websearch:
             content_length = len(str(await response.content.read()))
             if not self.is_filtered(response.status):
                 print(
-                    f"{method:10}\t{url:30}\t{response.status:5}\t{content_length:8}")
+                    f"{method:10}\t{url:40}\t{response.status:<10}\t{content_length:<10}")
             self.errors = 0
-        except ClientConnectorError:
+        except Exception:
             self.errors += 1
 
     async def fetch_threaded(self, session: ClientSession, method: str, path: str) -> Coroutine:
@@ -98,15 +109,15 @@ class Websearch:
                         session=session, method=method, path=word))
             await asyncio.gather(*tasks)
 
-
-def stop_loop():
+def stop_loop(loop: asyncio.AbstractEventLoop):
     """
     Cancels pending tasks and stops event loop.
     """
     warnings.filterwarnings("ignore", category=DeprecationWarning)
-    for task in asyncio.Task.all_tasks():
-        task.cancel()
-    loop.stop()
+    all_tasks = asyncio.gather(*asyncio.all_tasks(loop), return_exceptions=True)
+    all_tasks.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        loop.run_until_complete(all_tasks)
 
 
 def valid_methods(arg: str) -> list:
@@ -148,7 +159,7 @@ if __name__ == "__main__":
     )
     argparser.add_argument(
         '-t', '--threads',
-        type=int,             
+        type=int,         
         help='number of threads',
         default=30
     )
@@ -179,13 +190,14 @@ if __name__ == "__main__":
     config = args.url, args.wordlist, args.threads, args.methods, args.max_errors, args.filter_include, args.filter_exclude
     loop = asyncio.get_event_loop()
     try:
+        sys.stderr.write(f"{'METHOD':10}\t{'URL':40}\t{'STATUS':<10}\t{'CONTENT LENGTH':<10}\n")
         loop.run_until_complete(Websearch(*config).run())
     except ErrorsLimitExceededException:
-        stop_loop()
         sys.stderr.write('Errors limit exceeded')
+        stop_loop(loop)
         sys.exit(1)
     except KeyboardInterrupt:
-        stop_loop()
+        stop_loop(loop)
         sys.exit(1)
     finally:
         loop.run_until_complete(loop.shutdown_asyncgens())
